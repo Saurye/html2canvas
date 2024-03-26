@@ -1,5 +1,5 @@
 import {CSSValue, nonFunctionArgSeparator, Parser} from '../syntax/parser';
-import {TokenType} from '../syntax/tokenizer';
+import {StringValueToken, TokenType} from '../syntax/tokenizer';
 import {ITypeDescriptor} from '../ITypeDescriptor';
 import {angle, deg} from './angle';
 import {getAbsoluteValue, isLengthPercentage} from './length-percentage';
@@ -102,6 +102,26 @@ const rgb = (_context: Context, args: CSSValue[]): number => {
     return 0;
 };
 
+const colorFn = (_context: Context, args: CSSValue[]): number => {
+    const tokens = args.filter(nonFunctionArgSeparator);
+
+    const firstToken = tokens[0];
+    if (firstToken.type === TokenType.STRING_TOKEN && firstToken.value === 'from') {
+        /* Relative values */
+        throw new Error('Attempting to parse an unsupported relative color function');
+    } else {
+        /* Absolute values */
+        const [colorSpace, ...restTokens] = tokens;
+        if (colorSpace.type !== TokenType.STRING_TOKEN || colorSpace.value !== 'srgb') {
+            throw new Error(
+                `Attempting to parse an unsupported colorspace "${(colorSpace as StringValueToken).value}"`
+            );
+        }
+
+        return rgb(_context, restTokens);
+    }
+};
+
 function hue2rgb(t1: number, t2: number, hue: number): number {
     if (hue < 0) {
         hue += 1;
@@ -149,7 +169,8 @@ const SUPPORTED_COLOR_FUNCTIONS: {
     hsl: hsl,
     hsla: hsl,
     rgb: rgb,
-    rgba: rgb
+    rgba: rgb,
+    color: colorFn
 };
 
 export const parseColor = (context: Context, value: string): Color =>
